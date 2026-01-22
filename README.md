@@ -118,7 +118,7 @@ Here’s a tiny example that:
   getInput(
     prompt: "Temperature unit? (C/F) — you *can* type Kelvin, I guess",
     validate: text,
-    default: "C"
+    options: ["C", "F"]
   ) -> unitRaw
 
   # Normalize input to a known unit (guardrails + reasoning)
