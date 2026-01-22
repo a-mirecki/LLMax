@@ -1,0 +1,63 @@
+LLMax Commercial License
+Version 1.0
+
+Copyright (c) 2025 LLMax Contributors
+
+This license governs the commercial use of the LLMax Reference
+Implementation and any enterprise-only components.
+
+==============================================================================
+1. Grant of License
+==============================================================================
+
+Subject to payment of applicable fees, LLMax grants you a non-exclusive,
+non-transferable, non-sublicensable license to use, modify, and deploy
+the LLMax software in production and commercial environments.
+
+==============================================================================
+2. Permitted Use
+==============================================================================
+
+This license is required if you:
+- Use the LLMax reference implementation in production
+- Embed it in a commercial SaaS or internal enterprise system
+- Modify and redistribute it internally
+- Offer LLMax-based services to third parties
+- Require SLAs, enterprise support, or compliance guarantees
+
+==============================================================================
+3. Restrictions
+==============================================================================
+
+You may not:
+- Redistribute the software as open source
+- Remove copyright or license notices
+- Claim ownership of LLMax intellectual property
+
+==============================================================================
+4. Ownership
+==============================================================================
+
+LLMax retains all right, title, and interest in the software,
+including all intellectual property rights.
+
+==============================================================================
+5. No Warranty
+==============================================================================
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+==============================================================================
+6. Termination
+==============================================================================
+
+This license terminates automatically upon breach of its terms.
+
+==============================================================================
+7. Contact
+==============================================================================
+
+For commercial licensing inquiries:
+arkmirecki@gmail.com

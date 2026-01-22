@@ -1,0 +1,186 @@
+#!llmax/1.0
+
+@name: "Research Assistant"
+@version: "1.0.0"
+@description: "Researches a topic using web search and synthesizes findings"
+@author: "arkmirecki@gmail.com"
+
+@requires: {
+  tools: [web_search],
+  llm: true
+}
+
+---
+
+@pipeline main {
+  # Get research topic
+  getInput(
+    prompt: "What topic would you like to research?",
+    validate: text,
+    minLength: 3
+  ) -> topic
+
+  getInput(
+    prompt: "How deep should the research be?",
+    options: ["quick", "standard", "thorough"],
+    default: "standard"
+  ) -> depth
+
+  log(message: "Starting {depth} research on: {topic}")
+
+  # Determine number of searches based on depth
+  @switch ({depth}) {
+    @case "quick" {
+      assign(value: 1) -> searchCount
+      assign(value: 3) -> resultsPerSearch
+    }
+    @case "standard" {
+      assign(value: 3) -> searchCount
+      assign(value: 5) -> resultsPerSearch
+    }
+    @case "thorough" {
+      assign(value: 5) -> searchCount
+      assign(value: 10) -> resultsPerSearch
+    }
+  }
+
+  # Generate search queries
+  llmCall(
+    prompt: """
+    Generate {searchCount} specific search queries to research: "{topic}"
+
+    Make each query target a different aspect:
+    - Basic definition/overview
+    - Recent developments/news
+    - Expert opinions/analysis
+    - Practical applications
+    - Common challenges/criticisms
+
+    Return only the queries as a JSON array of strings.
+    """,
+    schema: {
+      type: "array",
+      items: { type: "string" },
+      minItems: 1,
+      maxItems: 5
+    }
+  ) -> searchQueries
+
+  # Perform searches in parallel
+  assign(value: []) -> allResults
+
+  @parallel.foreach (query in {searchQueries}, concurrency: 3) {
+    webSearch(
+      query: "{query}",
+      maxResults: {resultsPerSearch},
+      freshness: "month"
+    ) -> searchResults[]
+  }
+
+  # Combine all results
+  assign(source: {searchResults}, path: "$[*].results[*]") -> allResults
+
+  log(message: "Found {allResults.length} total results")
+
+  # Synthesize research
+  llmCall(
+    prompt: """
+    You are a research analyst. Synthesize these search results about "{topic}":
+
+    {allResults}
+
+    Create a comprehensive research report with:
+
+    ## Executive Summary
+    Brief 2-3 sentence overview
+
+    ## Key Findings
+    - Bullet points of main discoveries
+
+    ## Detailed Analysis
+    Expand on the most important points
+
+    ## Sources
+    List the most relevant sources with brief descriptions
+
+    ## Further Research
+    Questions that warrant additional investigation
+
+    Be objective, cite sources where relevant, and note any conflicting information.
+    """,
+    temperature: 0.3,
+    maxTokens: 2000,
+    schema: {
+      type: "object",
+      properties: {
+        summary: { type: "string" },
+        keyFindings: {
+          type: "array",
+          items: { type: "string" }
+        },
+        analysis: { type: "string" },
+        sources: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              url: { type: "string" },
+              relevance: { type: "string" }
+            }
+          }
+        },
+        furtherQuestions: {
+          type: "array",
+          items: { type: "string" }
+        }
+      },
+      required: ["summary", "keyFindings"]
+    }
+  ) -> research
+
+  # Format and output
+  output(value: "# Research Report: {topic}\n\n## Summary\n{research.summary}", format: markdown)
+
+  output(value: "## Key Findings", format: markdown)
+  @foreach (finding in {research.keyFindings}) {
+    output(value: "- {finding}", format: markdown)
+  }
+
+  output(value: "\n## Analysis\n{research.analysis}", format: markdown)
+
+  @if ({research.sources}.length > 0) {
+    output(value: "\n## Sources", format: markdown)
+    @foreach (source in {research.sources}) {
+      output(value: "- [{source.title}]({source.url}) - {source.relevance}", format: markdown)
+    }
+  }
+
+  # Offer follow-up
+  getInput(
+    prompt: "Would you like to dive deeper into any specific finding? Enter a number or 'no'",
+    validate: text,
+    default: "no"
+  ) -> followUp
+
+  @if ({followUp} != "no") {
+    assign(expr: "int({followUp}) - 1") -> findingIndex
+    @if ({findingIndex} >= 0 && {findingIndex} < {research.keyFindings}.length) {
+      assign(source: {research.keyFindings}, path: "$[{findingIndex}]") -> selectedFinding
+
+      webSearch(
+        query: "{selectedFinding} {topic}",
+        maxResults: 10
+      ) -> deepDive
+
+      llmCall(
+        prompt: "Provide more details on this specific finding: {selectedFinding}\n\nAdditional sources: {deepDive}",
+        maxTokens: 1000
+      ) -> details
+
+      output(value: "\n## Deep Dive: {selectedFinding}\n{details}", format: markdown)
+    }
+  }
+
+  output(value: "\n---\nResearch completed.", format: text)
+}

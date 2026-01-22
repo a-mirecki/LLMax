@@ -1,0 +1,22 @@
+LLMax Protocol
+
+Copyright 2025 LLMax Contributors
+
+This product includes software developed by the LLMax project.
+
+Licensed under the Apache License, Version 2.0.
+
+================================================================================
+
+LLMax is dual-licensed:
+
+1. The protocol specification, schemas, and SDKs are licensed under Apache 2.0
+   See LICENSE for details.
+
+2. The reference implementation is licensed under AGPLv3
+   See LICENSE-AGPL for details.
+
+3. Commercial use requires a separate license
+   See LICENSE-COMMERCIAL for details.
+
+For licensing inquiries: arkmirecki@gmail.com

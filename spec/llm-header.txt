@@ -1,0 +1,291 @@
+# LLMAX EXECUTION INSTRUCTIONS
+
+You are about to execute an .llmax workflow file. LLMax is an LLM-agnostic protocol for defining executable agentic workflows.
+
+## YOUR TASK
+
+1. Read the .llmax workflow file provided below
+2. Parse and execute it according to these rules
+3. Execute instructions sequentially unless specified otherwise
+4. Maintain variable state throughout execution
+5. Output results as specified
+
+---
+
+## FILE STRUCTURE
+
+```
+#!llmax/1.0                    # Version (required, first line)
+@name: "Pipeline Name"         # Name (required)
+@version: "1.0.0"             # Version (required)
+@description: "..."           # Description (optional)
+@author: "..."                # Author (optional)
+
+@vars {                       # Variables (optional)
+  VAR_NAME: "value"
+  API_KEY: env("API_KEY")     # From environment
+  const MAX: 10               # Constant
+}
+
+---
+
+@pipeline main {              # Main entry point (required)
+  # Instructions here
+}
+```
+
+---
+
+## VARIABLE SYNTAX
+
+**Reference variables:** `{variableName}`
+**Nested access:** `{response.data.user.name}`
+**Array index:** `{items[0]}` or `{items[-1]}` (last)
+**Default value:** `{value ?? "fallback"}`
+**String interpolation:** `"Hello {name}, you have {count} items"`
+
+**Reserved:**
+- `{$result}` - Last instruction output
+- `{$error}` - Current error (in catch blocks)
+- `{$index}` - Loop index
+- `{$item}` - Current loop item
+- `{$now}` - Current ISO timestamp
+
+---
+
+## INSTRUCTIONS
+
+### getInput - Get user input
+```
+getInput(
+  prompt: "Enter name:",
+  validate: text,              # text|number|email|url|json
+  default: "value",
+  secret: false
+) -> variableName
+```
+
+### apiCall - HTTP request
+```
+apiCall(
+  url: "https://api.example.com/endpoint",
+  method: GET,                 # GET|POST|PUT|PATCH|DELETE
+  headers: { "Authorization": "Bearer {API_KEY}" },
+  body: { "key": "value" },
+  timeout: 30s
+) -> response
+
+# Output: { status, statusText, headers, data, error }
+```
+
+### llmCall - LLM completion
+```
+llmCall(
+  prompt: "Analyze: {text}",
+  system: "You are a helpful assistant",
+  temperature: 0.7,
+  maxTokens: 1000,
+  schema: {                    # Optional: for structured JSON output
+    type: "object",
+    properties: {
+      field: { type: "string" }
+    },
+    required: ["field"]
+  }
+) -> result
+```
+
+### assign - Set/transform values
+```
+assign(value: "literal") -> var
+assign(value: {sourceVar}) -> var
+assign(path: "$.data.items[*].name", source: {response}) -> var
+assign(expr: "{a} + {b}") -> var
+```
+
+### webSearch - Search web
+```
+webSearch(
+  query: "{topic} latest news",
+  maxResults: 10,
+  freshness: "week"            # day|week|month|year
+) -> results
+```
+
+### fileRead - Read file
+```
+fileRead(
+  path: "./data.json",
+  parseAs: "json"              # text|json|lines
+) -> content
+```
+
+### fileWrite - Write file
+```
+fileWrite(
+  path: "./output.json",
+  content: {data},
+  mode: "overwrite"            # overwrite|append
+)
+```
+
+### output - Display result
+```
+output(
+  value: {result},
+  format: "json",              # text|json|markdown|html
+  label: "Result"
+)
+```
+
+### log - Debug logging
+```
+log(
+  message: "Processing {id}",
+  level: "info"                # debug|info|warn|error
+)
+```
+
+### javascript - Execute custom code
+```
+javascript {
+  code: `
+    const items = {input};
+    return items.filter(x => x.active);
+  `
+} -> result
+```
+
+---
+
+## CONTROL FLOW
+
+### Conditional
+```
+@if ({status} == "success") {
+  # Then branch
+} @elif ({status} == "pending") {
+  # Elif branch
+} @else {
+  # Else branch
+}
+```
+
+**Operators:** `==` `!=` `>` `<` `>=` `<=` `&&` `||` `!`
+**Special:** `contains` `matches /regex/` `is type`
+
+### Loops
+```
+# For-each
+@foreach (item in {array}) {
+  # Use {item}, {$index}
+  @continue  # Skip to next
+  @break     # Exit loop
+}
+
+# Range
+@for (i in range(0, 10)) {
+  # i = 0, 1, 2, ..., 9
+}
+
+# While
+@while ({condition}) {
+  # Loop body
+}
+```
+
+### Parallel execution
+```
+@parallel {
+  @branch name1 {
+    apiCall(...) -> result1
+  }
+  @branch name2 {
+    apiCall(...) -> result2
+  }
+}
+# Both result1 and result2 available after
+```
+
+### Switch
+```
+@switch ({value}) {
+  @case "option1" { # ... }
+  @case "option2" { # ... }
+  @default { # ... }
+}
+```
+
+### Error handling
+```
+@try {
+  apiCall(...) -> response
+  @if ({response.status} != 200) {
+    @throw ValidationError("Failed: {response.status}")
+  }
+} @catch (NetworkError) {
+  log(message: "Network error: {$error.message}")
+} @catch {
+  log(message: "Unknown error: {$error.message}")
+} @finally {
+  log(message: "Cleanup")
+}
+```
+
+**Error types:** NetworkError, TimeoutError, ValidationError, AuthError, NotFoundError, RateLimitError, ParseError
+
+---
+
+## EXECUTION RULES
+
+1. **Sequential execution:** Instructions run top-to-bottom within blocks
+2. **Variable scope:**
+   - Global: `@vars` block
+   - Pipeline: Created within `@pipeline`
+   - Block: Loop variables, `{$error}` in catch
+3. **Output variables:** Store instruction results using `-> variableName`
+4. **String interpolation:** Replace `{var}` with values in strings
+5. **JSONPath:** Use `$.field.path[*]` for complex data extraction
+6. **Control flow:** Evaluate conditions, execute matching branches
+7. **Error propagation:** Uncaught errors stop execution
+
+---
+
+## EXAMPLE EXECUTION
+
+```llmax
+#!llmax/1.0
+@name: "Example"
+@version: "1.0.0"
+
+@vars {
+  API_URL: "https://api.example.com"
+}
+
+@pipeline main {
+  getInput(prompt: "Enter topic:") -> topic
+
+  webSearch(
+    query: "{topic} information",
+    maxResults: 5
+  ) -> results
+
+  llmCall(
+    prompt: "Summarize these search results: {results}",
+    temperature: 0.3
+  ) -> summary
+
+  output(value: {summary}, format: "text")
+}
+```
+
+**Execution steps:**
+1. Prompt user for topic → store in `{topic}`
+2. Search web with query → store in `{results}`
+3. Call LLM with prompt (interpolating variables) → store in `{summary}`
+4. Display `{summary}` to user
+
+---
+
+## NOW EXECUTE THE FOLLOWING WORKFLOW:
+

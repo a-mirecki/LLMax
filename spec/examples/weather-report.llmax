@@ -1,0 +1,133 @@
+#!llmax/1.0
+
+@name: "Weather Report Generator"
+@version: "1.0.0"
+@description: "Fetches weather data for a city and generates a friendly report"
+@author: "arkmirecki@gmail.com"
+
+@requires: {
+  tools: [web_access],
+  llm: true
+}
+
+@vars {
+  WEATHER_API_KEY: env("OPENWEATHER_API_KEY")
+  WEATHER_BASE_URL: "https://api.openweathermap.org/data/2.5"
+}
+
+---
+
+@pipeline main {
+  # Step 1: Get city name from user
+  getInput(
+    prompt: "Enter the city name for weather report",
+    validate: text,
+    minLength: 2
+  ) -> city
+
+  log(message: "Fetching weather for: {city}")
+
+  # Step 2: Call weather API
+  @try {
+    apiCall(
+      url: "{WEATHER_BASE_URL}/weather",
+      query: {
+        q: "{city}",
+        appid: "{WEATHER_API_KEY}",
+        units: "metric"
+      },
+      timeout: 30s
+    ) -> weatherResponse
+  } @catch (NotFoundError) {
+    output(value: "City '{city}' not found. Please check the spelling.", format: text)
+    @return
+  } @catch (AuthError) {
+    output(value: "API authentication failed. Please check your API key.", format: text)
+    @return
+  }
+
+  # Step 3: Extract weather data
+  assign(source: {weatherResponse}, path: "$.data.main.temp") -> temperature
+  assign(source: {weatherResponse}, path: "$.data.main.feels_like") -> feelsLike
+  assign(source: {weatherResponse}, path: "$.data.main.humidity") -> humidity
+  assign(source: {weatherResponse}, path: "$.data.weather[0].description") -> condition
+  assign(source: {weatherResponse}, path: "$.data.wind.speed") -> windSpeed
+  assign(source: {weatherResponse}, path: "$.data.name") -> cityName
+
+  log(message: "Weather data extracted: {temperature}C, {condition}")
+
+  # Step 4: Generate friendly report using LLM
+  llmCall(
+    prompt: """
+    Generate a friendly, conversational weather report for {cityName}.
+
+    Current conditions:
+    - Temperature: {temperature}C (feels like {feelsLike}C)
+    - Humidity: {humidity}%
+    - Condition: {condition}
+    - Wind: {windSpeed} m/s
+
+    Include:
+    1. A brief summary of the weather
+    2. What to wear or bring (umbrella, sunglasses, etc.)
+    3. Best activities for this weather
+
+    Keep it concise (3-4 sentences) and helpful.
+    """,
+    temperature: 0.7,
+    maxTokens: 300
+  ) -> report
+
+  # Step 5: Output the report
+  output(value: {report}, format: markdown, label: "Weather Report")
+
+  # Step 6: Ask if user wants more details
+  getInput(
+    prompt: "Would you like a 5-day forecast? (yes/no)",
+    validate: /^(yes|no)$/i,
+    default: "no"
+  ) -> wantsForecast
+
+  @if ({wantsForecast} == "yes") {
+    fetchForecast(city: {city}) -> forecast
+    output(value: {forecast}, format: markdown, label: "5-Day Forecast")
+  }
+
+  output(value: "Thank you for using Weather Report Generator!", format: text)
+}
+
+---
+
+@function fetchForecast(city: string) -> string {
+  apiCall(
+    url: "{WEATHER_BASE_URL}/forecast",
+    query: {
+      q: "{city}",
+      appid: "{WEATHER_API_KEY}",
+      units: "metric",
+      cnt: 40
+    }
+  ) -> forecastResponse
+
+  assign(source: {forecastResponse}, path: "$.data.list") -> forecastData
+
+  llmCall(
+    prompt: """
+    Create a 5-day weather forecast summary from this data:
+
+    {forecastData}
+
+    Format as a simple day-by-day summary with:
+    - Day name
+    - High/Low temperature
+    - Expected conditions
+    - Brief recommendation
+
+    Use markdown formatting with headers for each day.
+    """,
+    temperature: 0.5,
+    maxTokens: 500
+  ) -> formattedForecast
+
+  @return {formattedForecast}
+}
