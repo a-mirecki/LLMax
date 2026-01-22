@@ -48,7 +48,7 @@ LLMax lets the model **use its reasoning** to handle edge cases, while your work
 
 ## Build workflows visually (fast)
 
-The web builderis built for **super quick creation and customization** of workflows. No ceremony, no friction, just shipping.
+The web builder is built for **super quick creation and customization** of workflows. No ceremony, no friction, just shipping.
 
 ![Website screenshot](assets/website.png)
 
@@ -65,6 +65,8 @@ LLMax files are **human-readable pipelines** that any LLM can execute: There’s
 ## Compatibility
 
 LLMax is designed to run in places where the LLM can **follow structured, step-by-step instructions** and (ideally) handle tool/function calls.
+
+![Gemini execution](assets/gemini.png)
 
 **Works well with:**
 - **Claude (web + Claude Code)**
