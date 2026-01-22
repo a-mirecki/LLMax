@@ -172,9 +172,11 @@ LLMax is currently **alpha**.
 
 Planned:
 - **Run everything in the web app** (end-to-end execution)
+- Image generation support
 - More editor features to match the protocol capabilities
 - Plugins and third party integrations
 - More examples, templates, and reusable modules
+
 
 ---
 
